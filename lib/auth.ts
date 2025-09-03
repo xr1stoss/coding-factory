@@ -1,61 +1,90 @@
 // lib/auth.ts
-import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { getServerSession } from "next-auth/next";
 import { compare } from "bcryptjs";
-import type { NextAuthOptions } from "next-auth";
 import { prisma } from "@/lib/prisma";
 
-export const authOptions: NextAuthOptions = {
+import type { Session } from "next-auth";
+import type { JWT } from "next-auth/jwt";
+
+type Role = "ADMIN" | "INSTRUCTOR" | "STUDENT";
+
+export const authOptions = {
   adapter: PrismaAdapter(prisma),
+
   providers: [
     CredentialsProvider({
-      name: "credentials",
+      name: "Credentials",
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+      async authorize(credentials: Record<string, unknown> | undefined) {
+        const email = credentials?.email as string | undefined;
+        const password = credentials?.password as string | undefined;
+        if (!email || !password) return null;
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            username: true,
+            role: true,
+            password: true, // for compare only
+          },
         });
-
         if (!user) return null;
 
-        const isValid = await compare(credentials.password, user.password);
-        if (!isValid) return null;
+        const ok = await compare(password, user.password);
+        if (!ok) return null;
 
-        return user;
+        return {
+          id: String(user.id),
+          name: user.name,
+          email: user.email,
+          username: user.username ?? null,
+          role: user.role as Role | null,
+        };
       },
     }),
   ],
-  session: {
-    strategy: "jwt",
-  },
+
+  // literal keeps TS happy (no wider `string`)
+  session: { strategy: "jwt" as const },
+
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: JWT; user?: any }): Promise<JWT> {
+      // On sign-in, merge user props into the token
       if (user) {
-        token.id = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.username = user.username;
-        token.role = user.role;
+        (token as any).username = (user as any).username ?? null;
+        (token as any).role = (user as any).role ?? null;
       }
       return token;
     },
-    async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string;
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
-        session.user.username = token.username as string;
-        session.user.role = token.role as string;
+
+    async session({
+      session,
+      token,
+    }: {
+      session: Session;
+      token: JWT;
+    }): Promise<Session> {
+      if (session.user) {
+        (session.user as any).id = (token as any).sub;
+        (session.user as any).username = (token as any).username ?? null;
+        (session.user as any).role = (token as any).role ?? null;
       }
       return session;
     },
   },
+
   pages: {
     signIn: "/login",
   },
 };
+
+// Server-only helper to avoid repeating casts at call sites
+export const getSession = () => getServerSession(authOptions as any);

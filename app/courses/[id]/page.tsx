@@ -1,8 +1,16 @@
+// app/courses/[id]/page.tsx
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next"; // ✅ correct import
 import { authOptions } from "@/lib/auth";
 import Image from "next/image";
 import EnrollButton from "./_EnrollButton";
+
+// minimal local typing for this page only
+type SessionUser = {
+  id?: string | number;
+  role?: "ADMIN" | "INSTRUCTOR" | "STUDENT";
+};
+type AppSession = { user?: SessionUser } | null;
 
 export default async function CoursePage({
   params,
@@ -10,7 +18,7 @@ export default async function CoursePage({
   params: { id: string };
 }) {
   const id = Number(params.id);
-  const session = await getServerSession(authOptions);
+  const session = (await getServerSession(authOptions)) as AppSession;
   const user = session?.user;
 
   const course = await prisma.course.findUnique({
@@ -50,6 +58,7 @@ export default async function CoursePage({
             alt={course.title}
             fill
             className="object-cover"
+            priority
           />
         </div>
         <h1 className="text-3xl font-bold">{course.title}</h1>

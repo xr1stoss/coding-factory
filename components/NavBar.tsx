@@ -3,9 +3,18 @@
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 
+type AppUser = {
+  id?: string | number;
+  role?: "ADMIN" | "INSTRUCTOR" | "STUDENT";
+  username?: string | null;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+};
+
 export default function NavBar() {
   const { data: session, status } = useSession();
-  const user = session?.user;
+  const user = session?.user as AppUser | undefined; // 👈 cast here
 
   return (
     <nav className="border-b bg-white">
