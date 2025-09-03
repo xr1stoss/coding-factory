@@ -1,14 +1,25 @@
 // app/admin/page.tsx
 import { prisma } from "@/lib/prisma";
-import { authOptions } from "@/lib/auth"; // ✅ Correct path to your authOptions
+import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth/next";
 import Link from "next/link";
 
+// Minimal local type for this page only
+type SessionUser = {
+  role?: "ADMIN" | "INSTRUCTOR" | "STUDENT";
+  username?: string | null;
+  name?: string | null;
+  email?: string | null;
+};
+type AppSession = { user?: SessionUser } | null;
+
 export default async function AdminDashboard() {
-  const session = await getServerSession(authOptions);
+  const session = (await getServerSession(authOptions)) as AppSession;
 
   // 🚫 Guard: only ADMIN can see this page
-  if (!session || session.user.role !== "ADMIN") return <p>Access Denied</p>;
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return <p>Access Denied</p>;
+  }
 
   // ✅ Fetch instructors
   const instructors = await prisma.user.findMany({
@@ -46,9 +57,7 @@ export default async function AdminDashboard() {
         orderBy: { createdAt: "desc" },
         select: {
           id: true,
-          course: {
-            select: { id: true, title: true },
-          },
+          course: { select: { id: true, title: true } },
         },
       },
     },
