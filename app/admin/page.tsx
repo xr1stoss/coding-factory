@@ -1,7 +1,7 @@
 // app/admin/page.tsx
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth"; // ✅ Correct path to your authOptions
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import Link from "next/link";
 
 export default async function AdminDashboard() {
